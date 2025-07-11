@@ -4,17 +4,68 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QuantForge - Trading Strategy Builder</title>
-    <link href="/styles.css" rel="stylesheet">
+    <style>
+        /* Embedded Tailwind CSS Subset for Production */
+        :root {
+            --tw-bg-opacity: 1;
+            --tw-text-opacity: 1;
+            --tw-border-opacity: 1;
+            --tw-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        }
+        .bg-gray-800 { background-color: rgba(31, 41, 55, var(--tw-bg-opacity)); }
+        .bg-blue-500 { background-color: rgba(59, 130, 246, var(--tw-bg-opacity)); }
+        .bg-green-500 { background-color: rgba(34, 197, 94, var(--tw-bg-opacity)); }
+        .bg-red-500 { background-color: rgba(239, 68, 68, var(--tw-bg-opacity)); }
+        .bg-yellow-500 { background-color: rgba(234, 179, 8, var(--tw-bg-opacity)); }
+        .bg-purple-500 { background-color: rgba(168, 85, 247, var(--tw-bg-opacity)); }
+        .bg-indigo-500 { background-color: rgba(99, 102, 241, var(--tw-bg-opacity)); }
+        .bg-blue-100 { background-color: rgba(219, 234, 254, var(--tw-bg-opacity)); }
+        .bg-green-100 { background-color: rgba(220, 252, 231, var(--tw-bg-opacity)); }
+        .bg-red-100 { background-color: rgba(254, 226, 226, var(--tw-bg-opacity)); }
+        .bg-yellow-100 { background-color: rgba(254, 243, 199, var(--tw-bg-opacity)); }
+        .bg-gray-100 { background-color: rgba(243, 244, 246, var(--tw-bg-opacity)); }
+        .bg-white { background-color: rgba(255, 255, 255, var(--tw-bg-opacity)); }
+        .text-white { color: rgba(255, 255, 255, var(--tw-text-opacity)); }
+        .text-black { color: rgba(0, 0, 0, var(--tw-text-opacity)); }
+        .border-blue-500 { border-color: rgba(59, 130, 246, var(--tw-border-opacity)); }
+        .border-green-500 { border-color: rgba(34, 197, 94, var(--tw-border-opacity)); }
+        .border-red-500 { border-color: rgba(239, 68, 68, var(--tw-border-opacity)); }
+        .border-yellow-500 { border-color: rgba(234, 179, 8, var(--tw-border-opacity)); }
+        .p-1 { padding: 0.25rem; }
+        .p-2 { padding: 0.5rem; }
+        .p-4 { padding: 1rem; }
+        .mr-2 { margin-right: 0.5rem; }
+        .mt-2 { margin-top: 0.5rem; }
+        .mt-4 { margin-top: 1rem; }
+        .text-2xl { font-size: 1.5rem; line-height: 2rem; }
+        .text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+        .font-bold { font-weight: 700; }
+        .border { border-width: 1px; }
+        .border-2 { border-width: 2px; }
+        .rounded { border-radius: 0.25rem; }
+        .rounded-lg { border-radius: 0.5rem; }
+        .shadow { box-shadow: var(--tw-shadow); }
+        .h-screen { height: 100vh; }
+        .flex { display: flex; }
+        .flex-col { flex-direction: column; }
+        .justify-between { justify-content: space-between; }
+        .absolute { position: absolute; }
+        .top-4 { top: 1rem; }
+        .right-4 { right: 1rem; }
+        .flex-1 { flex: 1 1 0%; }
+        .mb-2 { margin-bottom: 0.5rem; }
+    </style>
     <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/react-flow-renderer@10.3.17/dist/ReactFlow.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios@1.4.0/dist/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.22.5/Babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <div id="root"></div>
     <script type="text/babel">
-        const { useState, useCallback } = React;
+        const { useState, useEffect, useCallback } = React;
         const ReactFlow = window.ReactFlow.default;
         const {
             ReactFlowProvider,
@@ -198,9 +249,36 @@
 
             const generateCode = () => {
                 let code = 'import pandas as pd\n';
-                code += 'from alpaca_trade_api.rest import REST\n\n';
-                code += 'def trading_strategy(data):\n';
-                code += '    trades = []\n';
+                code += 'from alpaca_trade_api.rest import REST\n';
+                code += 'import logging\n\n';
+                code += '# Configure logging\n';
+                code += 'logging.basicConfig(level=logging.INFO)\n';
+                code += 'logger = logging.getLogger(__name__)\n\n';
+                code += 'class TradingBot:\n';
+                code += '    def __init__(self, api_key, secret_key, paper=True):\n';
+                code += '        self.api = REST(api_key, secret_key, base_url="https://paper-api.alpaca.markets" if paper else "https://api.alpaca.markets")\n';
+                code += '        self.positions = {}\n\n';
+                code += '    def get_data(self, symbol, timeframe="1Min", limit=1000):\n';
+                code += '        try:\n';
+                code += '            bars = self.api.get_bars(symbol, timeframe, limit=limit).df\n';
+                code += '            return bars\n';
+                code += '        except Exception as e:\n';
+                code += '            logger.error(f"Error fetching data for {symbol}: {e}")\n';
+                code += '            return None\n\n';
+                code += '    def execute_trade(self, symbol, action, qty=100):\n';
+                code += '        try:\n';
+                code += '            order = self.api.submit_order(\n';
+                code += '                symbol=symbol,\n';
+                code += '                qty=qty,\n';
+                code += '                side=action,\n';
+                code += '                type="market",\n';
+                code += '                time_in_force="gtc"\n';
+                code += '            )\n';
+                code += '            logger.info(f"Submitted {action} order for {symbol}: {order.id}")\n';
+                code += '        except Exception as e:\n';
+                code += '            logger.error(f"Error executing {action} for {symbol}: {e}")\n\n';
+                code += '    def trading_strategy(self, data):\n';
+                code += '        trades = []\n';
 
                 const operatorNode = nodes.find((n) => n.type === 'operator');
                 const variableNode = nodes.find((n) => n.type === 'variable');
@@ -213,18 +291,26 @@
                     const action = actionNode.data.action;
                     const stock = stockNode.data.stock === 'single' ? `'${stockNode.data.symbol}'` : 'universe';
 
-                    code += `    # Rule: ${condition} ${variable} then ${action} ${stock}\n`;
-                    code += `    if ${stock} == 'universe':\n`;
-                    code += `        for symbol in data['symbol'].unique():\n`;
-                    code += `            stock_data = data[data['symbol'] == symbol]\n`;
-                    code += `            if stock_data['metric'] ${condition.replace('if ', '')} ${variable}:\n`;
-                    code += `                trades.append({'symbol': symbol, 'action': '${action}'})\n`;
-                    code += `    else:\n`;
-                    code += `        if data['metric'] ${condition.replace('if ', '')} ${variable}:\n`;
-                    code += `            trades.append({'symbol': ${stock}, 'action': '${action}'})\n`;
+                    code += `        # Rule: ${condition} ${variable} then ${action} ${stock}\n`;
+                    code += `        if ${stock} == 'universe':\n`;
+                    code += `            for symbol in data['symbol'].unique():\n`;
+                    code += `                stock_data = data[data['symbol'] == symbol]\n`;
+                    code += `                if stock_data['metric'] ${condition.replace('if ', '')} ${variable}:\n`;
+                    code += `                    self.execute_trade(symbol, '${action}')\n`;
+                    code += `                    trades.append({'symbol': symbol, 'action': '${action}'})\n`;
+                    code += `        else:\n`;
+                    code += `            if data['metric'] ${condition.replace('if ', '')} ${variable}:\n`;
+                    code += `                self.execute_trade(${stock}, '${action}')\n`;
+                    code += `                trades.append({'symbol': ${stock}, 'action': '${action}'})\n`;
                 }
 
-                code += '    return trades\n';
+                code += '        return trades\n\n';
+                code += 'if __name__ == "__main__":\n';
+                code += '    bot = TradingBot("YOUR_ALPACA_KEY", "YOUR_ALPACA_SECRET")\n';
+                code += '    data = bot.get_data("AAPL")\n';
+                code += '    if data is not None:\n';
+                code += '        trades = bot.trading_strategy(data)\n';
+                code += '        logger.info(f"Trades executed: {trades}")\n';
                 setExportedCode(code);
             };
 
@@ -241,6 +327,32 @@
                     setBacktestResults({ error: 'Backtest failed. Please check your configuration.' });
                 }
             };
+
+            useEffect(() => {
+                if (backtestResults && backtestResults.performance && backtestResults.performance.returns) {
+                    const ctx = document.getElementById('returnsChart');
+                    if (ctx) {
+                        new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: backtestResults.performance.returns.map(r => r.date),
+                                datasets: [{
+                                    label: 'Portfolio Returns',
+                                    data: backtestResults.performance.returns.map(r => r.value),
+                                    borderColor: 'rgba(59, 130, 246, 1)',
+                                    fill: false,
+                                }],
+                            },
+                            options: {
+                                scales: {
+                                    x: { title: { display: true, text: 'Date' } },
+                                    y: { title: { display: true, text: 'Returns' } }
+                                }
+                            }
+                        });
+                    }
+                }
+            }, [backtestResults]);
 
             return (
                 <div className="h-screen flex flex-col">
@@ -308,7 +420,17 @@
                                     {backtestResults && (
                                         <div>
                                             <h2 className="text-lg font-bold">Backtest Results</h2>
-                                            <pre>{JSON.stringify(backtestResults, null, 2)}</pre>
+                                            {backtestResults.error ? (
+                                                <pre>{backtestResults.error}</pre>
+                                            ) : (
+                                                <>
+                                                    <p><strong>Win Rate:</strong> {(backtestResults.performance.winRate * 100).toFixed(2)}%</p>
+                                                    <p><strong>Sharpe Ratio:</strong> {backtestResults.performance.sharpeRatio.toFixed(2)}</p>
+                                                    <p><strong>Max Drawdown:</strong> {(backtestResults.performance.maxDrawdown * 100).toFixed(2)}%</p>
+                                                    <canvas id="returnsChart" width="400" height="200"></canvas>
+                                                    <pre>{JSON.stringify(backtestResults.trades, null, 2)}</pre>
+                                                </>
+                                            )}
                                         </div>
                                     )}
                                     {exportedCode && (

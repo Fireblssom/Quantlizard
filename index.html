@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuantForge - Trading Strategy Builder</title>
+    <link href="/styles.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-flow-renderer@10.3.17/dist/ReactFlow.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.4.0/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.22.5/Babel.min.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const { useState, useCallback } = React;
+        const ReactFlow = window.ReactFlow.default;
+        const {
+            ReactFlowProvider,
+            useNodesState,
+            useEdgesState,
+            addEdge,
+            Handle,
+            Position
+        } = window.ReactFlow;
+
+        // Custom Node Components
+        const OperatorNode = ({ data }) => (
+            <div className="p-4 bg-blue-100 border-2 border-blue-500 rounded-lg shadow-md">
+                <Handle type="target" position={Position.Left} />
+                <div className="text-center">
+                    <select
+                        className="p-1 border rounded"
+                        value={data.operator}
+                        onChange={(e) => data.onChange(e.target.value)}
+                    >
+                        <option value="if_greater">If Greater</option>
+                        <option value="if_less">If Less</option>
+                        <option value="if_equal">If Equal</option>
+                    </select>
+                </div>
+                <Handle type="source" position={Position.Right} />
+            </div>
+        );
+
+        const VariableNode = ({ data }) => (
+            <div className="p-4 bg-green-100 border-2 border-green-500 rounded-lg shadow-md">
+                <Handle type="target" position={Position.Left} />
+                <div className="text-center">
+                    <select
+                        className="p-1 border rounded mb-2"
+                        value={data.type}
+                        onChange={(e) => data.onChangeType(e.target.value)}
+                    >
+                        <option value="percent">Percent</option>
+                        <option value="fixed">Fixed Value</option>
+                        <option value="custom">Custom Metric</option>
+                    </select>
+                    {data.type === 'custom' ? (
+                        <input
+                            type="text"
+                            className="p-1 border rounded"
+                            placeholder="Custom Metric Name"
+                            value={data.value}
+                            onChange={(e) => data.onChangeValue(e.target.value)}
+                        />
+                    ) : (
+                        <input
+                            type="number"
+                            className="p-1 border rounded"
+                            placeholder="Value"
+                            value={data.value}
+                            onChange={(e) => data.onChangeValue(e.target.value)}
+                        />
+                    )}
+                </div>
+                <Handle type="source" position={Position.Right} />
+            </div>
+        );
+
+        const ActionNode = ({ data }) => (
+            <div className="p-4 bg-red-100 border-2 border-red-500 rounded-lg shadow-md">
+                <Handle type="target" position={Position.Left} />
+                <div className="text-center">
+                    <select
+                        className="p-1 border rounded"
+                        value={data.action}
+                        onChange={(e) => data.onChange(e.target.value)}
+                    >
+                        <option value="buy">Buy</option>
+                        <option value="sell">Sell</option>
+                    </select>
+                </div>
+                <Handle type="source" position={Position.Right} />
+            </div>
+        );
+
+        const StockNode = ({ data }) => (
+            <div className="p-4 bg-yellow-100 border-2 border-yellow-500 rounded-lg shadow-md">
+                <Handle type="target" position={Position.Left} />
+                <div className="text-center">
+                    <select
+                        className="p-1 border rounded"
+                        value={data.stock}
+                        onChange={(e) => data.onChange(e.target.value)}
+                    >
+                        <option value="universe">Entire Universe</option>
+                        <option value="single">Single Stock</option>
+                    </select>
+                    {data.stock === 'single' && (
+                        <input
+                            type="text"
+                            className="p-1 border rounded mt-2"
+                            placeholder="Stock Symbol"
+                            value={data.symbol}
+                            onChange={(e) => data.onChangeSymbol(e.target.value)}
+                        />
+                    )}
+                </div>
+                <Handle type="source" position={Position.Right} />
+            </div>
+        );
+
+        const nodeTypes = {
+            operator: OperatorNode,
+            variable: VariableNode,
+            action: ActionNode,
+            stock: StockNode,
+        };
+
+        // Main App Component
+        const App = () => {
+            const [nodes, setNodes, onNodesChange] = useNodesState([]);
+            const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+            const [api, setApi] = useState('alpaca');
+            const [backtestResults, setBacktestResults] = useState(null);
+            const [exportedCode, setExportedCode] = useState('');
+
+            const onConnect = useCallback(
+                (params) => setEdges((eds) => addEdge(params, eds)),
+                [setEdges]
+            );
+
+            const addNode = (type) => {
+                const newNode = {
+                    id: `${type}-${Date.now()}`,
+                    type,
+                    position: { x: Math.random() * 500, y: Math.random() * 500 },
+                    data: {
+                        onChange: (value) => {
+                            setNodes((nds) =>
+                                nds.map((node) =>
+                                    node.id === newNode.id
+                                        ? { ...node, data: { ...node.data, [type]: value } }
+                                        : node
+                                )
+                            );
+                        },
+                        onChangeType: type === 'variable'
+                            ? (value) => {
+                                  setNodes((nds) =>
+                                      nds.map((node) =>
+                                          node.id === newNode.id
+                                              ? { ...node, data: { ...node.data, type: value, value: '' } }
+                                              : node
+                                      )
+                                  );
+                              }
+                            : null,
+                        onChangeValue: type === 'variable'
+                            ? (value) => {
+                                  setNodes((nds) =>
+                                      nds.map((node) =>
+                                          node.id === newNode.id
+                                              ? { ...node, data: { ...node.data, value } }
+                                              : node
+                                      )
+                                  );
+                              }
+                            : null,
+                        onChangeSymbol: type === 'stock'
+                            ? (value) => {
+                                  setNodes((nds) =>
+                                      nds.map((node) =>
+                                          node.id === newNode.id
+                                              ? { ...node, data: { ...node.data, symbol: value } }
+                                              : node
+                                      )
+                                  );
+                              }
+                            : null,
+                        [type]: type === 'variable' ? { type: 'percent', value: '' } : type === 'stock' ? { stock: 'universe', symbol: '' } : ''
+                    },
+                };
+                setNodes((nds) => [...nds, newNode]);
+            };
+
+            const generateCode = () => {
+                let code = 'import pandas as pd\n';
+                code += 'from alpaca_trade_api.rest import REST\n\n';
+                code += 'def trading_strategy(data):\n';
+                code += '    trades = []\n';
+
+                const operatorNode = nodes.find((n) => n.type === 'operator');
+                const variableNode = nodes.find((n) => n.type === 'variable');
+                const actionNode = nodes.find((n) => n.type === 'action');
+                const stockNode = nodes.find((n) => n.type === 'stock');
+
+                if (operatorNode && variableNode && actionNode && stockNode) {
+                    const condition = operatorNode.data.operator.replace('_', ' ');
+                    const variable = variableNode.data.type === 'custom' ? variableNode.data.value : `${variableNode.data.value}${variableNode.data.type === 'percent' ? '%' : ''}`;
+                    const action = actionNode.data.action;
+                    const stock = stockNode.data.stock === 'single' ? `'${stockNode.data.symbol}'` : 'universe';
+
+                    code += `    # Rule: ${condition} ${variable} then ${action} ${stock}\n`;
+                    code += `    if ${stock} == 'universe':\n`;
+                    code += `        for symbol in data['symbol'].unique():\n`;
+                    code += `            stock_data = data[data['symbol'] == symbol]\n`;
+                    code += `            if stock_data['metric'] ${condition.replace('if ', '')} ${variable}:\n`;
+                    code += `                trades.append({'symbol': symbol, 'action': '${action}'})\n`;
+                    code += `    else:\n`;
+                    code += `        if data['metric'] ${condition.replace('if ', '')} ${variable}:\n`;
+                    code += `            trades.append({'symbol': ${stock}, 'action': '${action}'})\n`;
+                }
+
+                code += '    return trades\n';
+                setExportedCode(code);
+            };
+
+            const runBacktest = async () => {
+                try {
+                    const response = await axios.post('/api/backtest', {
+                        api,
+                        nodes,
+                        edges,
+                    });
+                    setBacktestResults(response.data);
+                } catch (error) {
+                    console.error('Backtest failed:', error);
+                    setBacktestResults({ error: 'Backtest failed. Please check your configuration.' });
+                }
+            };
+
+            return (
+                <div className="h-screen flex flex-col">
+                    <div className="p-4 bg-gray-800 text-white flex justify-between">
+                        <h1 className="text-2xl">QuantForge - Trading Strategy Builder</h1>
+                        <div>
+                            <select
+                                className="p-2 mr-2 border rounded"
+                                value={api}
+                                onChange={(e) => setApi(e.target.value)}
+                            >
+                                <option value="alpaca">Alpaca</option>
+                                <option value="polygon">Polygon</option>
+                            </select>
+                            <button
+                                className="p-2 bg-blue-500 text-white rounded mr-2"
+                                onClick={() => addNode('operator')}
+                            >
+                                Add Operator
+                            </button>
+                            <button
+                                className="p-2 bg-green-500 text-white rounded mr-2"
+                                onClick={() => addNode('variable')}
+                            >
+                                Add Variable
+                            </button>
+                            <button
+                                className="p-2 bg-red-500 text-white rounded mr-2"
+                                onClick={() => addNode('action')}
+                            >
+                                Add Action
+                            </button>
+                            <button
+                                className="p-2 bg-yellow-500 text-white rounded mr-2"
+                                onClick={() => addNode('stock')}
+                            >
+                                Add Stock
+                            </button>
+                            <button
+                                className="p-2 bg-purple-500 text-white rounded mr-2"
+                                onClick={runBacktest}
+                            >
+                                Run Backtest
+                            </button>
+                            <button
+                                className="p-2 bg-indigo-500 text-white rounded"
+                                onClick={generateCode}
+                            >
+                                Export Code
+                            </button>
+                        </div>
+                    </div>
+                    <div className="flex-1">
+                        <ReactFlowProvider>
+                            <ReactFlow
+                                nodes={nodes}
+                                edges={edges}
+                                onNodesChange={onNodesChange}
+                                onEdgesChange={onEdgesChange}
+                                onConnect={onConnect}
+                                nodeTypes={nodeTypes}
+                                fitView
+                            >
+                                <div className="absolute top-4 right-4 bg-white p-4 rounded shadow">
+                                    {backtestResults && (
+                                        <div>
+                                            <h2 className="text-lg font-bold">Backtest Results</h2>
+                                            <pre>{JSON.stringify(backtestResults, null, 2)}</pre>
+                                        </div>
+                                    )}
+                                    {exportedCode && (
+                                        <div className="mt-4">
+                                            <h2 className="text-lg font-bold">Exported Code</h2>
+                                            <pre className="bg-gray-100 p-2 rounded">{exportedCode}</pre>
+                                        </div>
+                                    )}
+                                </div>
+                            </ReactFlow>
+                        </ReactFlowProvider>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>

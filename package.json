@@ -1,12 +1,13 @@
 {
-    "name": "quantforge",
-    "version": "1.0.0",
-    "scripts": {
-        "start": "node server.js"
-    },
-    "dependencies": {
-        "express": "^4.18.2",
-        "axios": "^1.4.0",
-        "alpaca-trade-api": "^2.4.1"
-    }
-}
+       "name": "quantforge",
+       "version": "1.0.0",
+       "license": "MIT",
+       "scripts": {
+           "start": "node server.js"
+       },
+       "dependencies": {
+           "express": "^4.18.2",
+           "axios": "^1.4.0",
+           "@alpaca/alpaca-trade-api": "^3.0.2"
+       }
+   }
